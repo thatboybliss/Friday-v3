@@ -1,26 +1,47 @@
 services:
+  # 1. Frontend (Static Site)
   - type: web
-    name: fridayai-website
+    name: friday-frontend
     env: static
-    buildCommand: ""
-    staticPublicPath: website
+    buildCommand: pnpm install && pnpm build
+    publishPath: ./dist
     routes:
-      - path: /
-        destination: index.html
+      - type: rewrite
+        source: /.*
+        destination: /index.html
 
+  # 2. Backend (Web Service)
   - type: web
-    name: fridayai-api
+    name: friday-api
     env: node
-    plan: free
-    buildCommand: "cd mobile-app && pnpm install --frozen-lockfile && pnpm build"
-    startCommand: "cd mobile-app && pnpm start"
-    healthCheckPath: /health
+    plan: standard # Recommended for heavy data processing
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3000
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        fromDatabase:
+          name: friday-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: friday-cache
+          property: connectionString
       - key: GEMINI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+
+# 3. Real-time Layer (Redis)
+databases:
+  - name: friday-db
+    plan: standard
+
+services:
+  - type: redis
+    name: friday-cache
+    plan: free # Can be upgraded for higher throughput
+    ipAllowList: [] # Only allow internal connections for security
+    
