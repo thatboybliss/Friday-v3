@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: fridayai-website
+    env: static
+    buildCommand: ""
+    staticPublicPath: website
+    routes:
+      - path: /
+        destination: index.html
+
+  - type: web
+    name: fridayai-api
+    env: node
+    plan: free
+    buildCommand: "cd mobile-app && pnpm install --frozen-lockfile && pnpm build"
+    startCommand: "cd mobile-app && pnpm start"
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
