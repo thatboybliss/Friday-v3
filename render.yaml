@@ -28,11 +28,10 @@ services:
         fromDatabase:
           name: friday-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: friday-cache
-          property: connectionString
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -43,9 +42,3 @@ databases:
   - name: friday-db
     plan: standard
     postgresMajorVersion: "16"
-
-# 4. Redis Cache
-redis:
-  - name: friday-cache
-    plan: standard
-    ipAllowList: []
