@@ -2,9 +2,9 @@ services:
   # 1. Frontend (Static Site)
   - type: web
     name: friday-frontend
-    env: static
+    runtime: static
     buildCommand: pnpm install && pnpm build
-    publishPath: ./dist
+    staticPublishPath: ./dist
     routes:
       - type: rewrite
         source: /.*
@@ -13,13 +13,17 @@ services:
   # 2. Backend (Web Service)
   - type: web
     name: friday-api
-    env: node
+    runtime: node
     plan: standard
     buildCommand: pnpm install && pnpm build
     startCommand: pnpm start
+    healthCheckPath: /health
+    numInstances: 2
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: friday-db
@@ -34,13 +38,14 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
 
-# 3. Databases
+# 3. Databases (PostgreSQL)
 databases:
   - name: friday-db
     plan: standard
+    postgresMajorVersion: "16"
 
 # 4. Redis Cache
 redis:
   - name: friday-cache
-    plan: free
+    plan: standard
     ipAllowList: []
