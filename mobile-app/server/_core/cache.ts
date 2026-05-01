@@ -1,101 +1,43 @@
-// Redis cache service using Upstash HTTP-based Redis
-// Replaces ioredis with @upstash/redis SDK
+// Lightweight in-memory cache used when no external cache provider is configured.
+const mem = new Map<string, { value: unknown; expiresAt?: number }>();
 
-import { Redis } from "@upstash/redis";
-
-let redisInstance: Redis | null = null;
-
-export function getRedis(): Redis {
-  if (!redisInstance) {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-    if (!url || !token) {
-      throw new Error(
-        "Redis configuration missing: set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN"
-      );
-    }
-
-    redisInstance = new Redis({
-      url,
-      token,
-    });
-  }
-
-  return redisInstance;
+function isExpired(expiresAt?: number) {
+  return typeof expiresAt === "number" && Date.now() > expiresAt;
 }
 
-// Cache operations
-export async function cacheGet(key: string): Promise<any> {
-  try {
-    const redis = getRedis();
-    return await redis.get(key);
-  } catch (error) {
-    console.error(`Cache get failed for key ${key}:`, error);
+export async function cacheGet<T = unknown>(key: string): Promise<T | null> {
+  const hit = mem.get(key);
+  if (!hit) return null;
+  if (isExpired(hit.expiresAt)) {
+    mem.delete(key);
     return null;
   }
+  return hit.value as T;
 }
 
-export async function cacheSet(
-  key: string,
-  value: any,
-  expirationSeconds?: number
-): Promise<void> {
-  try {
-    const redis = getRedis();
-    if (expirationSeconds) {
-      await redis.setex(key, expirationSeconds, JSON.stringify(value));
-    } else {
-      await redis.set(key, JSON.stringify(value));
-    }
-  } catch (error) {
-    console.error(`Cache set failed for key ${key}:`, error);
-  }
+export async function cacheSet(key: string, value: unknown, expirationSeconds?: number): Promise<void> {
+  const expiresAt = expirationSeconds ? Date.now() + expirationSeconds * 1000 : undefined;
+  mem.set(key, { value, expiresAt });
 }
 
 export async function cacheDelete(key: string): Promise<void> {
-  try {
-    const redis = getRedis();
-    await redis.del(key);
-  } catch (error) {
-    console.error(`Cache delete failed for key ${key}:`, error);
+  mem.delete(key);
+}
+
+export async function cacheClear(prefix?: string): Promise<void> {
+  if (!prefix) return mem.clear();
+  for (const k of mem.keys()) {
+    if (k.startsWith(prefix)) mem.delete(k);
   }
 }
 
-export async function cacheClear(pattern?: string): Promise<void> {
-  try {
-    const redis = getRedis();
-    if (pattern) {
-      // For patterns, you need to scan and delete
-      const keys = await redis.keys(pattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
-    } else {
-      // Clear all keys
-      await redis.flushdb();
-    }
-  } catch (error) {
-    console.error(`Cache clear failed:`, error);
-  }
+export async function cacheIncrement(key: string, amount = 1): Promise<number> {
+  const current = Number((await cacheGet<number>(key)) ?? 0);
+  const next = current + amount;
+  await cacheSet(key, next);
+  return next;
 }
 
-export async function cacheIncrement(key: string, amount: number = 1): Promise<number> {
-  try {
-    const redis = getRedis();
-    return (await redis.incrby(key, amount)) as number;
-  } catch (error) {
-    console.error(`Cache increment failed for key ${key}:`, error);
-    return 0;
-  }
-}
-
-export async function cacheDecrement(key: string, amount: number = 1): Promise<number> {
-  try {
-    const redis = getRedis();
-    return (await redis.decrby(key, amount)) as number;
-  } catch (error) {
-    console.error(`Cache decrement failed for key ${key}:`, error);
-    return 0;
-  }
+export async function cacheDecrement(key: string, amount = 1): Promise<number> {
+  return cacheIncrement(key, -amount);
 }

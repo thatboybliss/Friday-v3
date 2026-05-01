@@ -1,5 +1,4 @@
 services:
-  # 1. Frontend (Static Site)
   - type: web
     name: friday-frontend
     runtime: static
@@ -10,35 +9,22 @@ services:
         source: /.*
         destination: /index.html
 
-  # 2. Backend (Web Service)
   - type: web
     name: friday-api
     runtime: node
     plan: standard
     buildCommand: pnpm install && pnpm build
     startCommand: pnpm start
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     numInstances: 2
     envVars:
       - key: NODE_VERSION
         value: "20"
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: friday-db
-          property: connectionString
-      - key: UPSTASH_REDIS_REST_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
+      - key: MONGODB_URI
         sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-
-# 3. Databases (PostgreSQL)
-databases:
-  - name: friday-db
-    plan: standard
-    postgresMajorVersion: "16"
